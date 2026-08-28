@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Simple Calculator"
+description = "A focused calculator for everyday arithmetic with clickable and keyboard controls, clear feedback, and a polished compact interface."
+version = "1.0.0"
+id = "artifacts/simple-calculator"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21711
+
+[services.development]
+run = "pnpm --filter @workspace/simple-calculator run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/simple-calculator", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/simple-calculator/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21711"
+BASE_PATH = "/"
