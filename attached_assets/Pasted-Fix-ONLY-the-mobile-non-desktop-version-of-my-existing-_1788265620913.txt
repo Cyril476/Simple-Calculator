@@ -1,0 +1,111 @@
+Fix ONLY the mobile/non-desktop version of my existing Precision Calculator.
+
+IMPORTANT:
+The calculator already works perfectly in Desktop mode.
+DO NOT redesign it.
+DO NOT change the existing desktop UI.
+DO NOT rebuild the calculator from scratch.
+DO NOT add unnecessary Android/Capacitor features.
+
+PROBLEM:
+Desktop mode works correctly, but when the Replit preview is viewed in a mobile/non-desktop viewport, the calculator does not work/open/display correctly.
+
+TASK:
+
+1. Inspect the existing project and find the actual cause of the mobile problem.
+
+2. Make the calculator fully responsive for mobile phone screen sizes.
+
+3. The calculator must work correctly at approximately:
+- 320px width
+- 360px width
+- 375px width
+- 390px width
+- 412px width
+- 430px width
+
+4. Preserve the existing calculator design exactly:
+- Navy display
+- Cream/off-white background
+- Orange operator buttons
+- Dark equals button
+- Rounded buttons
+- Existing typography
+- Existing spacing and visual style
+
+5. On mobile:
+- No horizontal scrolling
+- No elements cut off
+- No buttons outside the screen
+- No overlapping elements
+- No unwanted zooming
+- No unwanted browser scrolling
+- Calculator should fit naturally inside the viewport
+- Buttons must remain large enough for touch
+- Display must remain readable
+- The entire calculator must be usable with one hand where practical
+
+6. Make sure the viewport is configured correctly.
+
+Check the HTML <head> and ensure an appropriate mobile viewport meta tag exists:
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+
+7. Inspect all CSS responsible for:
+- fixed widths
+- fixed heights
+- min-width
+- absolute positioning
+- grid columns
+- button sizing
+- overflow
+- viewport units
+
+Replace desktop-only sizing with responsive sizing where necessary.
+
+8. Do NOT use a separate mobile design.
+Use the same calculator design and make it responsive.
+
+9. Calculator functionality must remain unchanged:
+- AC
+- Delete
+- %
+- ÷
+- ×
+- −
+- +
+- =
+- decimal
+- zero
+- +/−
+- keyboard support if already implemented
+
+10. Test the actual application in a narrow/mobile viewport before finishing.
+
+Test at:
+360 × 800
+390 × 844
+412 × 915
+
+11. Also test Desktop mode afterward to make absolutely sure the existing desktop appearance has not been damaged.
+
+12. Do not finish by simply saying "mobile responsive".
+Actually run and verify the application.
+
+FINAL REQUIREMENT:
+
+Desktop:
+✅ Existing appearance preserved
+✅ Existing functionality preserved
+
+Mobile:
+✅ Calculator visible
+✅ Calculator usable
+✅ All buttons accessible
+✅ No horizontal scrolling
+✅ No clipping
+✅ No overlap
+✅ Touch interaction works
+✅ Same visual identity
+
+Only fix the mobile responsiveness/viewport issue. Do not make unrelated changes.

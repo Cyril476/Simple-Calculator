@@ -361,10 +361,44 @@ button { -webkit-tap-highlight-color: transparent; }
   .history-section { padding: 18px 16px 20px; }
 }
 
-@media (max-width: 390px) {
-  .instrument-shell { width: min(100% - 20px, 560px); }
-  .display-section { min-height: 163px; }
-  .calc-key { min-height: 56px; }
+@media (max-width: 390px), (max-width: 430px) and (max-height: 920px) {
+  .instrument-shell {
+    width: min(100% - 20px, 560px);
+    gap: 16px;
+    padding-top: 16px;
+    padding-bottom: 18px;
+  }
+  .brand-mark {
+    width: 32px;
+    height: 32px;
+    margin-bottom: 13px;
+    font-size: 14px;
+  }
+  .eyebrow { margin-bottom: 9px; }
+  .brand-title { font-size: 33px; }
+  .brand-copy {
+    max-width: 290px;
+    margin-top: 9px;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+  .display-section {
+    min-height: 148px;
+    padding: 17px 18px 17px;
+  }
+  .keypad-section { padding: 14px 12px 16px; }
+  .keypad { gap: 6px; }
+  .calc-key {
+    min-height: 47px;
+    border-radius: 11px;
+  }
+  .calc-key.utility { font-size: 15px; }
+  .calc-key.operator { font-size: 22px; }
+  .calc-key.equals { font-size: 25px; }
+  .key-hint { right: 8px; bottom: 6px; }
+  .history-section { padding: 14px 12px 16px; }
+  .history-heading { margin-bottom: 9px; }
+  .history-empty { font-size: 10px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
