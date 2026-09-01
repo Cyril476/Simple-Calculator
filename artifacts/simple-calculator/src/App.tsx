@@ -1,13 +1,23 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { App as CapacitorApp } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Delete, Keyboard } from 'lucide-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import {
+  calculate,
+  evaluate,
+  expressionFromTerms,
+  formatNumber,
+  readNumber,
+  type LastOperation,
+  type Operator,
+  type Term,
+} from '@/lib/calculator';
 import NotFound from '@/pages/not-found';
 import { Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
-
-type Operator = '+' | '−' | '×' | '÷';
 
 type HistoryItem = {
   id: number;
@@ -23,148 +33,230 @@ const operatorSymbols: Record<Operator, string> = {
   '÷': '÷',
 };
 
-function formatNumber(value: number): string {
-  if (!Number.isFinite(value)) return 'Error';
-  const rounded = Math.round((value + Number.EPSILON) * 1e12) / 1e12;
-  return String(rounded);
-}
-
-function readNumber(value: string): number {
-  return Number(value.replace(/,/g, ''));
-}
-
-function calculate(left: number, right: number, operation: Operator): number | null {
-  if (operation === '+') return left + right;
-  if (operation === '−') return left - right;
-  if (operation === '×') return left * right;
-  if (right === 0) return null;
-  return left / right;
-}
-
 function Home() {
   const [display, setDisplay] = useState('0');
-  const [storedValue, setStoredValue] = useState<number | null>(null);
+  const [terms, setTerms] = useState<Term[]>([]);
   const [operator, setOperator] = useState<Operator | null>(null);
   const [waitingForOperand, setWaitingForOperand] = useState(false);
   const [expression, setExpression] = useState('Ready for input');
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [lastOperation, setLastOperation] = useState<LastOperation | null>(
+    null,
+  );
   const [pressedKey, setPressedKey] = useState<string | null>(null);
   const [pulse, setPulse] = useState(0);
 
   const press = useCallback((key: string) => {
     setPressedKey(key);
-    window.setTimeout(() => setPressedKey((current) => (current === key ? null : current)), 130);
+    window.setTimeout(
+      () => setPressedKey((current) => (current === key ? null : current)),
+      130,
+    );
   }, []);
 
-  const animateValue = useCallback(() => setPulse((current) => current + 1), []);
+  const animateValue = useCallback(
+    () => setPulse((current) => current + 1),
+    [],
+  );
 
-  const handleDigit = useCallback((digit: string) => {
-    press(digit);
-    animateValue();
-    if (display === 'Cannot divide by zero') {
-      setDisplay(digit);
-      setExpression('Ready for input');
-      setStoredValue(null);
-      setOperator(null);
-      setWaitingForOperand(false);
-      return;
-    }
-    if (waitingForOperand) {
-      setDisplay(digit);
-      setWaitingForOperand(false);
-      return;
-    }
-    if (display === '-0') {
-      setDisplay(`-${digit}`);
-      return;
-    }
-    if (display === '0') {
-      setDisplay(digit);
-      return;
-    }
-    if (display.replace('-', '').replace('.', '').length >= 16) return;
-    setDisplay(`${display}${digit}`);
-  }, [animateValue, display, press, waitingForOperand]);
+  const handleDigit = useCallback(
+    (digit: string) => {
+      press(digit);
+      animateValue();
+
+      if (display === 'Cannot divide by zero') {
+        setDisplay(digit);
+        setExpression('Ready for input');
+        setTerms([]);
+        setOperator(null);
+        setLastOperation(null);
+        setWaitingForOperand(false);
+        return;
+      }
+
+      if (waitingForOperand) {
+        setDisplay(digit);
+        setWaitingForOperand(false);
+        if (!terms.length) setExpression('Ready for input');
+        setLastOperation(null);
+        return;
+      }
+
+      if (display === '-0') {
+        setDisplay(`-${digit}`);
+        return;
+      }
+
+      if (display === '0') {
+        setDisplay(digit);
+        return;
+      }
+
+      if (display.replace('-', '').replace('.', '').length >= 16) return;
+      setDisplay(`${display}${digit}`);
+    },
+    [animateValue, display, press, terms.length, waitingForOperand],
+  );
 
   const handleDecimal = useCallback(() => {
     press('.');
     animateValue();
+
     if (display === 'Cannot divide by zero') {
       setDisplay('0.');
       setExpression('Ready for input');
-      setStoredValue(null);
+      setTerms([]);
       setOperator(null);
+      setLastOperation(null);
       setWaitingForOperand(false);
       return;
     }
+
     if (waitingForOperand) {
       setDisplay('0.');
       setWaitingForOperand(false);
+      if (!terms.length) setExpression('Ready for input');
+      setLastOperation(null);
       return;
     }
-    if (!display.includes('.')) setDisplay(`${display}.`);
-  }, [animateValue, display, press, waitingForOperand]);
 
-  const handleOperator = useCallback((nextOperator: Operator) => {
-    press(nextOperator);
-    animateValue();
-    if (display === 'Cannot divide by zero') return;
-    const currentValue = readNumber(display);
-    if (storedValue !== null && operator && !waitingForOperand) {
-      const result = calculate(storedValue, currentValue, operator);
-      if (result === null) {
-        setDisplay('Cannot divide by zero');
-        setExpression('Cannot calculate');
-        setStoredValue(null);
-        setOperator(null);
-        setWaitingForOperand(true);
+    if (!display.includes('.')) setDisplay(`${display}.`);
+  }, [
+    animateValue,
+    display,
+    press,
+    terms.length,
+    waitingForOperand,
+  ]);
+
+  const handleOperator = useCallback(
+    (nextOperator: Operator) => {
+      press(nextOperator);
+      animateValue();
+
+      if (display === 'Cannot divide by zero') return;
+
+      const currentValue = readNumber(display);
+      if (waitingForOperand && terms.length) {
+        const updatedTerms = terms.map((term, index) =>
+          index === terms.length - 1
+            ? { ...term, operator: nextOperator }
+            : term,
+        );
+        setTerms(updatedTerms);
+        setOperator(nextOperator);
+        setExpression(expressionFromTerms(updatedTerms));
         return;
       }
-      const formatted = formatNumber(result);
-      setDisplay(formatted);
-      setStoredValue(result);
-      setExpression(`${formatted} ${operatorSymbols[nextOperator]}`);
-    } else {
-      setStoredValue(currentValue);
-      setExpression(`${formatNumber(currentValue)} ${operatorSymbols[nextOperator]}`);
-    }
-    setOperator(nextOperator);
-    setWaitingForOperand(true);
-  }, [animateValue, display, operator, press, storedValue, waitingForOperand]);
+
+      const updatedTerms = [
+        ...terms,
+        { value: currentValue, operator: nextOperator },
+      ];
+      setTerms(updatedTerms);
+      setOperator(nextOperator);
+      setExpression(expressionFromTerms(updatedTerms));
+      setWaitingForOperand(true);
+      setLastOperation(null);
+    },
+    [
+      animateValue,
+      display,
+      press,
+      terms,
+      waitingForOperand,
+    ],
+  );
 
   const handleEquals = useCallback(() => {
     press('=');
     animateValue();
-    if (display === 'Cannot divide by zero' || storedValue === null || operator === null) return;
-    const left = storedValue;
-    const right = waitingForOperand ? storedValue : readNumber(display);
-    const result = calculate(left, right, operator);
-    const readableExpression = `${formatNumber(left)} ${operatorSymbols[operator]} ${formatNumber(right)}`;
-    if (result === null) {
-      setDisplay('Cannot divide by zero');
+
+    if (display === 'Cannot divide by zero') return;
+
+    if (!terms.length && lastOperation) {
+      const left = readNumber(display);
+      const result = calculate(left, lastOperation.right, lastOperation.operator);
+      const readableExpression = `${formatNumber(left)} ${operatorSymbols[lastOperation.operator]} ${formatNumber(lastOperation.right)}`;
+
+      if (result === null) {
+        setDisplay('Cannot divide by zero');
+        setExpression(`${readableExpression} =`);
+        setLastOperation(null);
+        setWaitingForOperand(true);
+        return;
+      }
+
+      const formatted = formatNumber(result);
+      setHistory((items) =>
+        [
+          {
+            id: Date.now(),
+            expression: readableExpression,
+            result: formatted,
+          },
+          ...items,
+        ].slice(0, 4),
+      );
+      setDisplay(formatted);
       setExpression(`${readableExpression} =`);
-      setStoredValue(null);
-      setOperator(null);
       setWaitingForOperand(true);
       return;
     }
+
+    if (!terms.length) return;
+
+    const right = readNumber(display);
+    const values = [...terms.map((term) => term.value), right];
+    const operators = terms.map((term) => term.operator);
+    const result = evaluate(values, operators);
+    const readableExpression = `${expressionFromTerms(terms)} ${formatNumber(right)}`;
+    const repeatedOperation = {
+      operator: operators[operators.length - 1],
+      right,
+    };
+
+    if (result === null) {
+      setDisplay('Cannot divide by zero');
+      setExpression(`${readableExpression} =`);
+      setTerms([]);
+      setOperator(null);
+      setLastOperation(null);
+      setWaitingForOperand(true);
+      return;
+    }
+
     const formatted = formatNumber(result);
-    setHistory((items) => [
-      { id: Date.now(), expression: readableExpression, result: formatted },
-      ...items,
-    ].slice(0, 4));
+    setHistory((items) =>
+      [
+        {
+          id: Date.now(),
+          expression: readableExpression,
+          result: formatted,
+        },
+        ...items,
+      ].slice(0, 4),
+    );
     setDisplay(formatted);
     setExpression(`${readableExpression} =`);
-    setStoredValue(null);
+    setTerms([]);
     setOperator(null);
+    setLastOperation(repeatedOperation);
     setWaitingForOperand(true);
-  }, [animateValue, display, operator, press, storedValue, waitingForOperand]);
+  }, [
+    animateValue,
+    display,
+    lastOperation,
+    press,
+    terms,
+  ]);
 
   const handleClear = useCallback(() => {
     press('clear');
     setDisplay('0');
-    setStoredValue(null);
+    setTerms([]);
     setOperator(null);
+    setLastOperation(null);
     setWaitingForOperand(false);
     setExpression('Ready for input');
   }, [press]);
@@ -184,17 +276,28 @@ function Home() {
     press('sign');
     animateValue();
     if (display === 'Cannot divide by zero') return;
+
     if (waitingForOperand) {
-      setDisplay('-0');
-      setWaitingForOperand(false);
+      if (!terms.length) {
+        const nextDisplay = display.startsWith('-')
+          ? display.slice(1)
+          : `-${display}`;
+        setDisplay(nextDisplay === '' ? '0' : nextDisplay);
+        setExpression('Ready for input');
+        setWaitingForOperand(false);
+      } else {
+        setDisplay('-0');
+        setWaitingForOperand(false);
+      }
       return;
     }
+
     if (display === '0') {
       setDisplay('-0');
       return;
     }
     setDisplay(display.startsWith('-') ? display.slice(1) : `-${display}`);
-  }, [animateValue, display, press, waitingForOperand]);
+  }, [animateValue, display, press, terms.length, waitingForOperand]);
 
   const handlePercent = useCallback(() => {
     press('%');
@@ -203,7 +306,8 @@ function Home() {
     const percentage = readNumber(display) / 100;
     setDisplay(formatNumber(percentage));
     setWaitingForOperand(false);
-  }, [animateValue, display, press]);
+    if (!terms.length) setExpression('Ready for input');
+  }, [animateValue, display, press, terms.length]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -240,9 +344,47 @@ function Home() {
         handleSign();
       }
     };
+
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [handleBackspace, handleClear, handleDecimal, handleDigit, handleEquals, handleOperator, handlePercent, handleSign]);
+  }, [
+    handleBackspace,
+    handleClear,
+    handleDecimal,
+    handleDigit,
+    handleEquals,
+    handleOperator,
+    handlePercent,
+    handleSign,
+  ]);
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+
+    let listener: { remove: () => Promise<void> } | undefined;
+    const setupBackButton = async () => {
+      listener = await CapacitorApp.addListener(
+        'backButton',
+        ({ canGoBack }) => {
+          if (canGoBack) {
+            window.history.back();
+          } else if (
+            display !== '0' ||
+            Boolean(terms.length || operator)
+          ) {
+            handleClear();
+          } else {
+            void CapacitorApp.exitApp();
+          }
+        },
+      );
+    };
+
+    void setupBackButton();
+    return () => {
+      void listener?.remove();
+    };
+  }, [display, handleClear, operator, terms.length]);
 
   const numberKey = (digit: string) => (
     <button
@@ -271,7 +413,12 @@ function Home() {
     </button>
   );
 
-  const statusLabel = display === 'Cannot divide by zero' ? 'Check input' : operator ? 'In progress' : 'Ready';
+  const statusLabel =
+    display === 'Cannot divide by zero'
+      ? 'Check input'
+      : operator
+        ? 'In progress'
+        : 'Ready';
 
   return (
     <main className="instrument-page">
@@ -420,10 +567,15 @@ function RoutedErrorBoundary({ children }: { children: ReactNode }) {
 }
 
 function App() {
+  const appBase =
+    import.meta.env.BASE_URL === './'
+      ? ''
+      : import.meta.env.BASE_URL.replace(/\/$/, '');
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
+        <WouterRouter base={appBase}>
           <Router />
         </WouterRouter>
         <Toaster />

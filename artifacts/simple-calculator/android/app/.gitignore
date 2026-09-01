@@ -1,0 +1,7 @@
+/build/*
+!/build/.npmkeep
+
+# Never commit local signing material.
+*.jks
+*.keystore
+keystore.properties
