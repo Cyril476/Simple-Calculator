@@ -1,0 +1,1 @@
+- [Android toolchain](android-toolchain.md) — Capacitor Android 8 uses Java 21; emulator image installation may be unavailable in this container.
