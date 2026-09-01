@@ -340,6 +340,19 @@ button { -webkit-tap-highlight-color: transparent; }
 @keyframes row-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 
 @media (max-width: 767px) {
+  html, #root {
+    overflow-x: clip;
+    overflow-y: visible;
+  }
+  body {
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: auto;
+  }
+  .instrument-page {
+    overflow: visible;
+    touch-action: pan-y;
+  }
   .instrument-shell {
     width: min(100% - 28px, 560px);
     display: flex;
